@@ -1,0 +1,19 @@
+{
+  "name": "jubbio-music-bot",
+  "version": "1.0.0",
+  "description": "Jubbio platform music bot — plays YouTube audio via voice channel",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/index.js",
+    "postinstall": "node scripts/patch-jubbio-voice.js"
+  },
+  "dependencies": {
+    "@jubbio/core": "^1.4.2",
+    "@jubbio/voice": "^1.0.9",
+    "axios": "^1.7.2",
+    "dotenv": "^16.0.0",
+    "ws": "^8.18.0",
+    "yt-search": "^2.13.1"
+  }
+}
