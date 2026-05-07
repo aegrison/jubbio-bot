@@ -1,4 +1,9 @@
 require('dotenv').config();
+const http = require('http');
+http.createServer((req, res) => {
+  res.write('Arkovia Online');
+  res.end();
+}).listen(process.env.PORT || 3000);
 
 const { Client, GatewayIntentBits } = require('@jubbio/core');
 const { handleMessage } = require('./commands');
