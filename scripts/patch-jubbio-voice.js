@@ -1,15 +1,20 @@
 const fs = require('fs');
 const path = require('path');
 
-const filePath = path.resolve(__dirname, '../node_modules/@jubbio/core/dist/Client.js');
+// Dosya yolunu doğrudan node_modules içine hedefliyoruz
+const filePath = path.join(process.cwd(), 'node_modules', '@jubbio', 'core', 'dist', 'Client.js');
 
-console.log('Checking for voice file at:', filePath);
+console.log('Yamalanacak dosya aranıyor:', filePath);
 
 if (fs.existsSync(filePath)) {
     let content = fs.readFileSync(filePath, 'utf8');
-    content = content.replace(/selfDeaf:\s*true/g, 'selfDeaf: false');
-    fs.writeFileSync(filePath, content);
-    console.log('Jubbio voice patch applied successfully!');
+    if (content.includes('selfDeaf: true')) {
+        content = content.replace('selfDeaf: true', 'selfDeaf: false');
+        fs.writeFileSync(filePath, content);
+        console.log('✅ Jubbio ses yaması başarıyla uygulandı!');
+    } else {
+        console.log('ℹ️ Dosya zaten yamalı veya uygun satır bulunamadı.');
+    }
 } else {
-    console.log('Voice file not found at expected path. Skipping patch...');
+    console.log('❌ HATA: Jubbio kütüphane dosyası bulunamadı! Yol kontrol edilmeli.');
 }
