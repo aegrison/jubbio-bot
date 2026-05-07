@@ -8,7 +8,7 @@ const {
 const ytSearch = require('yt-search');
 const ytdl = require('@distube/ytdl-core');
 
-// Ortam değişkenlerini kodun içine gömüyoruz (Render'da ekleyemediğimiz için)
+// Ortam değişkenlerini kodun içine gömüyoruz
 process.env.YTDL_NO_UPDATE = '1'; 
 
 const sessions = new Map();
@@ -45,10 +45,13 @@ async function resolveTrack(query) {
   return videoToTrack(video);
 }
 
-function waitForReady(connection, timeoutMs = 20_000) {
+function waitForReady(connection, timeoutMs = 25_000) {
   return new Promise((resolve, reject) => {
     if (connection.state.status === VoiceConnectionStatus.Ready) return resolve();
-    const timer = setTimeout(() => reject(new Error('Bağlantı zaman aşımı.')), timeoutMs);
+    
+    const timer = setTimeout(() => {
+      reject(new Error('Ses kanalına bağlanılamadı (Zaman Aşımı).'));
+    }, timeoutMs);
     
     connection.once(VoiceConnectionStatus.Ready, () => {
       clearTimeout(timer);
@@ -61,14 +64,19 @@ async function joinChannel(guild, voiceChannelId, textChannelSend) {
   let session = getSession(guild.id);
   if (session) return session;
 
+  console.log(`[Voice] Kanala bağlanılıyor: ${voiceChannelId}`);
+
   const connection = joinVoiceChannel({
     channelId: voiceChannelId,
     guildId: guild.id,
     adapterCreator: guild.voiceAdapterCreator,
+    selfDeaf: true, // Render yükünü azaltmak için botu sağırlaştırıyoruz
+    selfMute: false,
   });
 
   try {
     await waitForReady(connection);
+    console.log('[Voice] Bağlantı başarılı!');
   } catch (err) {
     connection.destroy();
     throw err;
@@ -79,6 +87,13 @@ async function joinChannel(guild, voiceChannelId, textChannelSend) {
 
   session = { connection, player, queue: [], current: null, textChannelSend, guildId: guild.id };
   sessions.set(guild.id, session);
+
+  // Bağlantı koparsa otomatik temizle
+  connection.on('stateChange', (oldState, newState) => {
+    if (newState.status === VoiceConnectionStatus.Disconnected) {
+      deleteSession(guild.id);
+    }
+  });
 
   player.on('error', err => {
     console.error('[Hata]', err.message);
@@ -97,7 +112,10 @@ async function joinChannel(guild, voiceChannelId, textChannelSend) {
 async function advanceQueue(guildId) {
   const session = getSession(guildId);
   if (!session || !session.queue.length) {
-    if (session) session.textChannelSend('Sıra bitti.').catch(() => {});
+    if (session) {
+      session.current = null;
+      session.textChannelSend('Sıra bitti.').catch(() => {});
+    }
     return;
   }
 
@@ -105,7 +123,6 @@ async function advanceQueue(guildId) {
   session.current = track;
 
   try {
-    // İşte YouTube engelini aşan asıl kısım burası:
     const stream = ytdl(track.url, {
       filter: 'audioonly',
       highWaterMark: 1 << 25,
@@ -117,7 +134,8 @@ async function advanceQueue(guildId) {
     session.player.play(resource);
     session.textChannelSend(`🎶 Şu an çalıyor: **${track.title}**`).catch(() => {});
   } catch (err) {
-    session.textChannelSend(`Hata oluştu: ${err.message}`).catch(() => {});
+    console.error('[Çalma Hatası]', err.message);
+    session.textChannelSend(`Hata: ${track.title} çalınamadı.`).catch(() => {});
     advanceQueue(guildId);
   }
 }
